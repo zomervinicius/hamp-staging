@@ -135,6 +135,11 @@
     min-width: 100%;
   }
 
+  .product-information__media media-gallery,
+  .product-information__media .media-gallery__grid {
+    width: 100%;
+  }
+
   .product-information__media .product-media-gallery__placeholder-image {
     width: 100%;
     height: 100%;
@@ -169,37 +174,43 @@
     .product-information__grid:not(.product-information--media-none) {
       /* Media on the left side */
       &.product-information--media-left {
-        grid-template-columns: 1fr min(50vw, var(--sidebar-width));
+        grid-column: 1 / -1;
+        grid-template-columns: 55vw minmax(0, 1fr);
 
         .product-information__media {
           padding-right: calc(var(--gap, 0) / 2);
+          padding-left: var(--page-margin, 0px);
         }
 
         .product-details {
           padding-left: calc(var(--gap, 0) / 2);
+          padding-right: var(--page-margin, 0px);
         }
 
         &:has(.media-gallery--extend) {
-          grid-column: 1 / 3;
+          grid-column: 1 / -1;
         }
       }
 
       /* Media on the right side */
       &.product-information--media-right {
-        grid-template-columns: min(50vw, var(--sidebar-width)) 1fr;
+        grid-column: 1 / -1;
+        grid-template-columns: minmax(0, 1fr) 55vw;
 
         .product-information__media {
           padding-left: calc(var(--gap, 0) / 2);
+          padding-right: var(--page-margin, 0px);
           order: 1;
         }
 
         .product-details {
           padding-right: calc(var(--gap, 0) / 2);
+          padding-left: var(--page-margin, 0px);
           order: 0;
         }
 
         &:has(.media-gallery--extend) {
-          grid-column: 2 / -1;
+          grid-column: 1 / -1;
         }
       }
 
@@ -282,20 +293,20 @@
     }
   }
 
-  /* Wider sidebar for large screens */
+  /* Keep media column at 55vw on large screens */
   @media screen and (min-width: 1200px) {
     .product-information__grid:not(
         .product-information__grid--half,
         .product-information--media-none
       ).product-information--media-left {
-      grid-template-columns: 2fr 1fr;
+      grid-template-columns: 55vw minmax(0, 1fr);
     }
 
     .product-information__grid:not(
         .product-information__grid--half,
         .product-information--media-none
       ).product-information--media-right {
-      grid-template-columns: 1fr 2fr;
+      grid-template-columns: minmax(0, 1fr) 55vw;
     }
   }
 

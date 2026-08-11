@@ -228,6 +228,7 @@
     "product_badge_sale": "Sale",
     "product_card_placeholder": "Product title",
     "placeholder_image": "Placeholder image",
+    "pairs_with_empty": "Select products in the Pairs with metafield (custom.pairs_with) to show them here.",
     "quantity": "Quantity",
     "quantity_per_item": "/ea",
     "recently_viewed_products": "Recently viewed",
@@ -353,7 +354,8 @@
       "quantity_maximum": "Maximum of {{ maximum }}",
       "in_cart": "in cart",
       "default_title": "Default Title",
-      "sticky_add_to_cart": "Quick add to cart bar"
+      "sticky_add_to_cart": "Quick add to cart bar",
+      "size": "Size"
     }
   }
 }

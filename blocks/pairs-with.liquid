@@ -1,0 +1,641 @@
+{%- doc -%}
+  Pairs With widget: manually curated complementary products under Add to Cart.
+  Products come from a list.product_reference metafield (default: custom.pairs_with).
+{%- enddoc -%}
+
+<script
+  src="{{ 'pairs-with.js' | asset_url }}"
+  type="module"
+></script>
+
+<link
+  rel="preload"
+  href="{{ 'roboto-mono-regular.woff2' | asset_url }}"
+  as="font"
+  type="font/woff2"
+  crossorigin
+>
+<link
+  rel="preload"
+  href="{{ 'roboto-mono-medium.woff2' | asset_url }}"
+  as="font"
+  type="font/woff2"
+  crossorigin
+>
+<link
+  rel="preload"
+  href="{{ 'roboto-mono-semibold.woff2' | asset_url }}"
+  as="font"
+  type="font/woff2"
+  crossorigin
+>
+
+{% style %}
+  @font-face {
+    font-family: 'Roboto Mono';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('{{ 'roboto-mono-regular.woff2' | asset_url }}') format('woff2');
+  }
+
+  @font-face {
+    font-family: 'Roboto Mono';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('{{ 'roboto-mono-medium.woff2' | asset_url }}') format('woff2');
+  }
+
+  @font-face {
+    font-family: 'Roboto Mono';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('{{ 'roboto-mono-semibold.woff2' | asset_url }}') format('woff2');
+  }
+{% endstyle %}
+
+{% liquid
+  assign block_settings = block.settings
+  assign product = closest.product
+  assign metafield_namespace = block_settings.metafield_namespace | default: 'custom'
+  assign metafield_key = block_settings.metafield_key | default: 'pairs_with'
+  assign pairs_products = product.metafields[metafield_namespace][metafield_key].value
+  assign heading = block_settings.heading | default: 'PAIRS WITH'
+  assign show_widget = false
+
+  if pairs_products != blank and pairs_products.size > 0
+    assign show_widget = true
+  endif
+
+  if request.visual_preview_mode and show_widget == false
+    assign pairs_products = collections.all.products | reject: 'id', product.id
+    assign show_widget = true
+  endif
+%}
+
+{% if show_widget %}
+  <pairs-with
+    class="pairs-with spacing-style"
+    style="{% render 'spacing-style', settings: block_settings %}"
+    {{ block.shopify_attributes }}
+  >
+    <div class="pairs-with__header">
+      <h2 class="pairs-with__heading">{{ heading }}</h2>
+      <div class="pairs-with__nav">
+        <button
+          type="button"
+          class="pairs-with__nav-button pairs-with__nav-button--prev"
+          ref="prev"
+          on:click="/scrollPrev"
+          aria-label="{{ 'accessibility.slideshow_previous' | t }}"
+          disabled
+        >
+          {{
+            'pairs-with-arrow-left.png'
+            | asset_url
+            | img_tag: class: 'pairs-with__nav-icon', width: 15, height: 11, alt: '', loading: 'lazy'
+          }}
+        </button>
+        <button
+          type="button"
+          class="pairs-with__nav-button"
+          ref="next"
+          on:click="/scrollNext"
+          aria-label="{{ 'accessibility.slideshow_next' | t }}"
+        >
+          {{
+            'pairs-with-arrow-right.png'
+            | asset_url
+            | img_tag: class: 'pairs-with__nav-icon', width: 15, height: 11, alt: '', loading: 'lazy'
+          }}
+        </button>
+      </div>
+    </div>
+
+    <div
+      class="pairs-with__track"
+      ref="track"
+    >
+      {% for pair_product in pairs_products limit: block_settings.max_products %}
+        {% if pair_product == blank or pair_product.available == false %}
+          {% continue %}
+        {% endif %}
+
+        {% liquid
+          assign size_option = blank
+          assign size_option_index = 0
+          assign option_label = 'products.product.size' | t
+
+          for option in pair_product.options_with_values
+            assign option_name_down = option.name | downcase
+            if option_name_down == 'size' or option_name_down contains 'size'
+              assign size_option = option
+              assign size_option_index = forloop.index0
+              break
+            endif
+          endfor
+
+          if size_option == blank and pair_product.has_only_default_variant == false
+            assign size_option = pair_product.options_with_values.first
+            assign size_option_index = 0
+            assign option_label = size_option.name
+          endif
+
+          assign is_single_variant = false
+          if pair_product.has_only_default_variant or size_option == blank
+            assign is_single_variant = true
+          endif
+
+          assign featured_image = pair_product.selected_or_first_available_variant.featured_image
+          if featured_image == blank
+            assign featured_image = pair_product.featured_image
+          endif
+
+          assign display_price = pair_product.selected_or_first_available_variant.price
+          if settings.currency_code_enabled_product_cards
+            assign price_formatted = display_price | money_with_currency
+          else
+            assign price_formatted = display_price | money
+          endif
+        %}
+
+        {% liquid
+          assign image_alt = featured_image.alt | default: pair_product.title
+        %}
+
+        <pairs-with-item
+          class="pairs-with-card{% if is_single_variant %} pairs-with-card--single{% endif %}"
+          data-product-id="{{ pair_product.id }}"
+          data-option-index="{{ size_option_index }}"
+          data-single-variant="{{ is_single_variant }}"
+        >
+          <script type="application/json" ref="variantsJson">
+            [
+              {%- for variant in pair_product.variants -%}
+                {
+                  "id": {{ variant.id | json }},
+                  "title": {{ variant.title | json }},
+                  "available": {{ variant.available | json }},
+                  "price": {% if settings.currency_code_enabled_product_cards %}{{ variant.price | money_with_currency | json }}{% else %}{{ variant.price | money | json }}{% endif %},
+                  "options": {{ variant.options | json }}
+                }{%- unless forloop.last -%},{%- endunless -%}
+              {%- endfor -%}
+            ]
+          </script>
+
+          <a
+            href="{{ pair_product.url }}"
+            class="pairs-with-card__media"
+            aria-label="{{ pair_product.title | escape }}"
+          >
+            {% if featured_image != blank %}
+              {{
+                featured_image
+                | image_url: width: 280
+                | image_tag:
+                  loading: 'lazy',
+                  widths: '140, 200, 280',
+                  sizes: '140px',
+                  class: 'pairs-with-card__image',
+                  alt: image_alt
+              }}
+            {% else %}
+              {{ 'product-apparel-1' | placeholder_svg_tag: 'pairs-with-card__image pairs-with-card__image--placeholder' }}
+            {% endif %}
+          </a>
+
+          <div class="pairs-with-card__content">
+            <div class="pairs-with-card__info">
+              <a
+                href="{{ pair_product.url }}"
+                class="pairs-with-card__title"
+              >
+                {{- pair_product.title | replace: 'Athletic ', 'Athletic<br>' -}}
+              </a>
+              <p
+                class="pairs-with-card__price"
+                ref="price"
+              >
+                {{ price_formatted }}
+              </p>
+            </div>
+
+            <div class="pairs-with-card__actions">
+              <input
+                type="hidden"
+                name="id"
+                ref="variantId"
+                value="{% if is_single_variant %}{{ pair_product.selected_or_first_available_variant.id }}{% endif %}"
+              >
+
+              {% unless is_single_variant %}
+                <div class="pairs-with-card__size-wrap">
+                  <select
+                    class="pairs-with-card__size"
+                    ref="sizeSelect"
+                    aria-label="{{ option_label }}"
+                    on:change="/handleSizeChange"
+                  >
+                    <option
+                      value=""
+                      selected
+                      disabled
+                    >
+                      {{ option_label | upcase }}
+                    </option>
+                    {% for value in size_option.values %}
+                      <option
+                        value="{{ value.name | default: value | escape }}"
+                        {% unless value.available %}
+                          disabled
+                        {% endunless %}
+                      >
+                        {{ value.name | default: value }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                  <span class="pairs-with-card__size-icon svg-wrapper">
+                    {{- 'icon-caret.svg' | inline_asset_content -}}
+                  </span>
+                </div>
+              {% endunless %}
+
+              <button
+                type="button"
+                class="pairs-with-card__add{% if is_single_variant %} pairs-with-card__add--ready{% endif %}"
+                ref="addButton"
+                on:click="/handleAdd"
+                {% unless is_single_variant %}
+                  disabled
+                {% endunless %}
+                {% if is_single_variant and pair_product.selected_or_first_available_variant.available == false %}
+                  disabled
+                {% endif %}
+              >
+                {{ 'actions.add' | t | upcase }}
+              </button>
+            </div>
+          </div>
+        </pairs-with-item>
+      {% endfor %}
+    </div>
+  </pairs-with>
+{% elsif request.design_mode %}
+  <div
+    class="pairs-with pairs-with--empty spacing-style"
+    style="{% render 'spacing-style', settings: block_settings %}"
+    {{ block.shopify_attributes }}
+  >
+    <p class="pairs-with__empty">{{ 'content.pairs_with_empty' | t }}</p>
+  </div>
+{% endif %}
+
+{% stylesheet %}
+  .pairs-with {
+    --pairs-with-sans-font: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    --pairs-with-card-bg: #f6f6f6;
+
+    display: block;
+    width: 100%;
+  }
+
+  .pairs-with__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 10px;
+    padding: 0;
+  }
+
+  .pairs-with__heading {
+    margin: 0;
+    font-family: 'Roboto Mono', ui-monospace, monospace;
+    font-size: 17px;
+    font-weight: 500;
+    letter-spacing: 0;
+    line-height: 1.2;
+    text-transform: uppercase;
+    color: #000;
+  }
+
+  .pairs-with__nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pairs-with__nav-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 12px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .pairs-with__nav-button:disabled {
+    cursor: default;
+    opacity: 0.35;
+  }
+
+  .pairs-with__nav-icon {
+    display: block;
+    width: 15px;
+    height: auto;
+  }
+
+  .pairs-with__track {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .pairs-with__track::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pairs-with-card {
+    display: grid;
+    grid-template-columns: 128px minmax(0, 1fr);
+    align-items: stretch;
+    flex: 0 0 400px;
+    width: 400px;
+    height: 170px;
+    min-height: 170px;
+    background: var(--pairs-with-card-bg);
+    scroll-snap-align: start;
+  }
+
+  .pairs-with-card__media {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 12px 20px 20px;
+    text-decoration: none;
+  }
+
+  .pairs-with-card__image {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 116px;
+    object-fit: contain;
+  }
+
+  .pairs-with-card__image--placeholder {
+    width: 100%;
+    height: 100px;
+  }
+
+  .pairs-with-card__content {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 7px;
+    padding: 23px 20px 20px 8px;
+    min-width: 0;
+  }
+
+  .pairs-with-card__info {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-width: 0;
+  }
+
+  .pairs-with-card__title {
+    margin: 0;
+    font-family: var(--pairs-with-sans-font);
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.3;
+    color: #000;
+    text-decoration: none;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .pairs-with-card__price {
+    margin: 16px 0 0;
+    font-family: var(--pairs-with-sans-font);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.2;
+    color: #000;
+  }
+
+  .pairs-with-card__actions {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .pairs-with-card__size-wrap {
+    position: relative;
+    flex: 0 0 190px;
+    width: 190px;
+  }
+
+  .pairs-with-card__size {
+    appearance: none;
+    width: 190px;
+    height: 53px;
+    padding: 0 28px 0 12px;
+    border: 1.7px solid #000;
+    border-radius: 0;
+    background: #fff;
+    color: #000;
+    font-family: 'Roboto Mono', ui-monospace, monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .pairs-with-card__size:focus-visible {
+    outline: 2px solid #000;
+    outline-offset: 2px;
+  }
+
+  .pairs-with-card__size-icon {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    width: 10px;
+    height: 10px;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: #000;
+  }
+
+  .pairs-with-card__size-icon svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .pairs-with-card__add {
+    flex: 0 0 55px;
+    width: 55px;
+    height: 52px;
+    padding: 0;
+    border: 1px solid #d0d0d0;
+    border-radius: 0;
+    background: #f3f3f3;
+    color: #9a9a9a;
+    font-family: 'Roboto Mono', ui-monospace, monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: not-allowed;
+  }
+
+  .pairs-with-card__add--ready:not(:disabled) {
+    background: #fff;
+    border-color: #000;
+    color: #000;
+    cursor: pointer;
+  }
+
+  .pairs-with-card__add--ready:not(:disabled):hover {
+    background: #000;
+    color: #fff;
+  }
+
+  .pairs-with-card--single .pairs-with-card__actions {
+    justify-content: flex-end;
+  }
+
+  .pairs-with__empty {
+    margin: 0;
+    padding: 16px;
+    background: var(--pairs-with-card-bg);
+    font-size: 0.875rem;
+    color: #666;
+  }
+
+  @media screen and (max-width: 749px) {
+    .pairs-with-card {
+      flex-basis: min(100%, 400px);
+      width: min(100%, 400px);
+      height: 170px;
+      min-height: 170px;
+      grid-template-columns: 108px minmax(0, 1fr);
+    }
+
+    .pairs-with-card__media {
+      padding: 16px 8px 16px 16px;
+    }
+
+    .pairs-with-card__content {
+      padding: 23px 16px 16px 6px;
+      gap: 7px;
+    }
+
+    .pairs-with-card__add {
+      flex-basis: 55px;
+      width: 55px;
+    }
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "t:names.pairs_with",
+  "tag": null,
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:content.pairs_with_metafield_help"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:settings.heading",
+      "default": "PAIRS WITH"
+    },
+    {
+      "type": "text",
+      "id": "metafield_namespace",
+      "label": "t:settings.metafield_namespace",
+      "default": "custom"
+    },
+    {
+      "type": "text",
+      "id": "metafield_key",
+      "label": "t:settings.metafield_key",
+      "default": "pairs_with"
+    },
+    {
+      "type": "range",
+      "id": "max_products",
+      "label": "t:settings.product_count",
+      "min": 1,
+      "max": 12,
+      "step": 1,
+      "default": 8
+    },
+    {
+      "type": "header",
+      "content": "t:content.padding"
+    },
+    {
+      "type": "range",
+      "id": "padding-block-start",
+      "label": "t:settings.top",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "padding-block-end",
+      "label": "t:settings.bottom",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding-inline-start",
+      "label": "t:settings.left",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding-inline-end",
+      "label": "t:settings.right",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:names.pairs_with",
+      "category": "t:categories.product"
+    }
+  ]
+}
+{% endschema %}
